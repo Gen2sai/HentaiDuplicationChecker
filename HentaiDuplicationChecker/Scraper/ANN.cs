@@ -19,7 +19,7 @@ namespace Scraper
 
         public void getAllHentaiUrl()
         {
-            //regex method in region currently unused.
+            //regex method in region currently unused and commented out.
             #region
             //get total pages
             //int pages = getTotalPages();
@@ -79,8 +79,7 @@ namespace Scraper
             //using ANN api instead
             //note to self benchmark regex againts api
             int pages = getTotalPages();
-            //List<string> AnimeList = new List<string>();
-
+            
             List<string> urlList = new List<string>();
             for (int i = 0; i < pages; i++)
             {
@@ -104,6 +103,8 @@ namespace Scraper
                 //what to do with all urls
                 //sample http://cdn.animenewsnetwork.com/encyclopedia/api.xml?anime=11374&anime=11374
                 List<string> AnimeList = new List<string>();
+
+                //looping for 50 as max request via api limits to 50 different counts.
                 for (int i = 0; i <= urlList.Count / 50; i++)
                 {
                     string allID = @"encyclopedia/api.xml?";
@@ -132,13 +133,11 @@ namespace Scraper
                         
                         for (int y = 0; y < animeCount; y++)
                         {
-                            //Name
-                            //Alternative Names
-                            //episode
                             string oneLine = "";
                             //first add the titlename
                             oneLine += ana.anime[y].name + "$";
-                            //loop each info for other languages
+                            
+                            //loop each info for other anime languages
                             foreach (var item in ana.anime[y].info)
                             {
                                 if(!string.IsNullOrEmpty(item.type.ToString()))
@@ -147,7 +146,7 @@ namespace Scraper
                                     {
                                         oneLine += item.Text[0].ToString() + "$";
                                     }
-                                    else if (item.type.ToString().ToLower() == "Number of episodes")
+                                    else if (item.type.ToString().ToLower() == "number of episodes")
                                     {
                                         oneLine += item.Text[0].ToString();
                                     }
@@ -155,7 +154,6 @@ namespace Scraper
                             }
                             AnimeList.Add(oneLine);
                         }
-                        
                     }
                 }
                 writerHelper.WriterText(@"C:\Users\Genryu\Desktop\", @"log.txt", AnimeList);
