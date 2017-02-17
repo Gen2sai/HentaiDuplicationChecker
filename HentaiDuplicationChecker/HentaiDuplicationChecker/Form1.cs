@@ -14,97 +14,76 @@ namespace HentaiDuplicationChecker
         {
             InitializeComponent();
 
-            //string[] drives = Environment.GetLogicalDrives();
-            //foreach (string drive in drives)
-            //{
-            //    TreeNode node = new TreeNode(drive);
-            //    node.Tag = drive;
-            //    //Set Disk Icon
-            //    node.ImageIndex = 0;
-            //    node.Tag = drive;
-            //    treeView1.Nodes.Add(node);
-            //    node.Nodes.Add(new TreeNode("?"));
-            //}
-            //treeView1.BeforeExpand += new TreeViewCancelEventHandler(treeView1_BeforeExpand);
-        }
-
-        private void treeView1_BeforeExpand(object sender, TreeViewCancelEventArgs e)
-        {
-            if ((e.Node.Nodes.Count == 1) && (e.Node.Nodes[0].Text == "?"))
-            {
-                RecursiveDirWalk(e.Node);
-            }
-            foreach (System.Windows.Forms.TreeNode aNode in treeView1.Nodes)
-            {
-                //edit
-                if (aNode.Checked)
-                    foreach (TreeNode innerNode in aNode.Nodes)
-                    {
-                        if (innerNode.Checked)
-                        {
-                            Console.WriteLine(innerNode.FullPath);
-                        }
-                    }
-            }
-        }
-
-        private TreeNode RecursiveDirWalk(TreeNode node)
-        {
-            string path = (string)node.Tag;
-            node.Nodes.Clear();
-            string[] dirs = System.IO.Directory.GetDirectories(path);
-            for (int t = 0; t < dirs.Length; t++)
-            {
-                TreeNode n = new TreeNode(dirs[t].Substring(dirs[t].LastIndexOf('\\') + 1));
-                n.ImageIndex = 1; // dir icon
-                n.Tag = dirs[t];
-                node.Nodes.Add(n);
-                n.Nodes.Add(new TreeNode("?"));
-            }
-
-            // Optional if you want files as well:
-            string[] files = System.IO.Directory.GetFiles(path);
-            for (int t = 0; t < files.Length; t++)
-            {
-                TreeNode tn = new TreeNode(System.IO.Path.GetFileName(files[t]));
-                tn.Tag = files[t];
-                tn.ImageIndex = 2; // file icon
-                node.Nodes.Add(tn);
-            } // end of optional file part
-            return node;
         }
 
         private void button1_Click(object sender, EventArgs e)
         {
-            ann.getAllHentaiUrl();
-            //SearchDisk();
+            //i should return a list from the function below.
+            List<string> AnimeList = ann.getAllHentaiUrl();
+            List<string> FileNameList = SearchDisk();
+
+            SearchDuplication(AnimeList, FileNameList);
         }
 
-        private void SearchDisk()
+        private List<string> SearchDisk()
         {
             string tempDir = "Z:/Hentai";
+
             //Consider adding file extension checking also.
             List<string> FileNameList = new List<string>();
-            try
+            Dictionary<string, string> FileNameDictionary = new Dictionary<string, string>();
+
+            //Gets all files in root folder
+            foreach (string files in Directory.GetFiles(tempDir))
             {
-                foreach (string p in Directory.GetFiles(tempDir))
+                FileNameList.Add(Path.GetFileNameWithoutExtension(files) + "$" + files);
+            }
+
+            //Gets all files inside folder inside root folder
+            foreach (string folder in Directory.GetDirectories(tempDir))
+            {
+                foreach (string files in Directory.GetFiles(folder))
                 {
-                    FileNameList.Add(p.Replace(tempDir + @"\", ""));
+                    FileNameList.Add(Path.GetFileNameWithoutExtension(files) + "$" + files);
                 }
-                foreach (string p in Directory.GetDirectories(tempDir))
+            }
+
+            HelperProject.TitleRefactoringHelper TRH = new HelperProject.TitleRefactoringHelper();
+            FileNameList = TRH.titleRefactoring(FileNameList);
+
+            //writes to a log for debugging.
+            //writerHelper.WriterText(@"C:\Users\Genryu\Desktop\", @"MovieLog1.txt", FileNameList);
+
+            return FileNameList;
+            
+        }
+
+        private void SearchDuplication(List<string> AnimeList, List<string> FileNameList)
+        {
+            List<string> foundList = new List<string>();
+
+            foreach (string wholeAnimeLine in AnimeList)
+            {
+                //delimit line in animelist
+                string[] animeNamesArray = new string[wholeAnimeLine.Split('$').Count() - 1];
+                int episodes = wholeAnimeLine.Split('$').Length - 1;
+                for (int i = 0; i < wholeAnimeLine.Split('$').Count()-1; i++)
                 {
-                    foreach (string f in Directory.GetFiles(p))
+                    animeNamesArray[i] = wholeAnimeLine.Split('$')[i];
+                }
+
+                //loop the delimited strings inside folder list
+                for(int x = 0; x < FileNameList.Count(); x++)
+                {
+                    for (int i = 0; i < animeNamesArray.Count() - 1; i++)
                     {
-                        FileNameList.Add(Path.GetFileName(f));
+                        if (FileNameList[x].Split('$')[0].ToLower().Contains(animeNamesArray[i].ToLower()))
+                        {
+                            foundList.Add(FileNameList[x].Split('$')[1].ToLower() + " found with " + animeNamesArray[i].ToLower());
+                        }
                     }
                 }
-
-                //writes to a log for debugging.
-                writerHelper.WriterText(@"C:\Users\Genryu\Desktop\", @"MovieLog.txt", FileNameList);
-            }
-            catch
-            {
-
+                writerHelper.WriterText(@"C:\Users\Genryu\Desktop\", @"FoundLog.txt", foundList);
             }
         }
     }

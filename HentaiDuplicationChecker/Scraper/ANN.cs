@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Serialization;
+using HelperProject;
 
 namespace Scraper
 {
@@ -15,9 +16,9 @@ namespace Scraper
 
         //variable section
         string url = "http://www.animenewsnetwork.com/";
-        bool debugMode = true;
+        bool debugMode = false;
 
-        public void getAllHentaiUrl()
+        public List<string> getAllHentaiUrl()
         {
             //regex method in region currently unused and commented out.
             #region
@@ -75,89 +76,98 @@ namespace Scraper
             //debug purpose only
             //writerHelper.WriterText(@"C:\Users\Genryu\Desktop\", @"log.txt", tempList);
             #endregion
-
-            //using ANN api instead
-            //note to self benchmark regex againts api
-            int pages = getTotalPages();
-            
-            List<string> urlList = new List<string>();
-            for (int i = 0; i < pages; i++)
+            try
             {
-                string htmlPage = wcc.runWebClient(debugMode, 0, url + "encyclopedia/search/genreresults?w=series&a=AO&g=erotica&o=rating&pg=" + i);
+                //using ANN api instead
+                //note to self benchmark regex againts api
+                int pages = getTotalPages();
 
-                if (!String.IsNullOrEmpty(htmlPage))
+                List<string> urlList = new List<string>();
+                for (int i = 0; i < pages; i++)
                 {
-                    string pattern = "<a href=\".*id=(?<Url>.*?)\">(?<HentaiName>.*?)</a>\\s*<small class=\"de-emphasized\">(?<ReleaseDate>.*?)</small>";
+                    string htmlPage = wcc.runWebClient(debugMode, 0, url + "encyclopedia/search/genreresults?w=series&a=AO&g=erotica&o=rating&pg=" + i);
 
-                    MatchCollection m = Regex.Matches(htmlPage, pattern);
-
-                    foreach (Match match in m)
+                    if (!String.IsNullOrEmpty(htmlPage))
                     {
-                        urlList.Add(match.Groups["Url"].Value);
+                        string pattern = "<a href=\".*id=(?<Url>.*?)\">(?<HentaiName>.*?)</a>\\s*<small class=\"de-emphasized\">(?<ReleaseDate>.*?)</small>";
+
+                        MatchCollection m = Regex.Matches(htmlPage, pattern);
+
+                        foreach (Match match in m)
+                        {
+                            urlList.Add(match.Groups["Url"].Value);
+                        }
                     }
                 }
-            }
 
-            if (urlList.Count > 0)
-            {
-                //what to do with all urls
-                //sample http://cdn.animenewsnetwork.com/encyclopedia/api.xml?anime=11374&anime=11374
                 List<string> AnimeList = new List<string>();
-
-                //looping for 50 as max request via api limits to 50 different counts.
-                for (int i = 0; i <= urlList.Count / 50; i++)
+                if (urlList.Count > 0)
                 {
-                    string allID = @"encyclopedia/api.xml?";
-                    if(i == urlList.Count / 50)
+                    //what to do with all urls
+                    //sample http://cdn.animenewsnetwork.com/encyclopedia/api.xml?anime=11374&anime=11374
+
+                    //looping for 50 as max request via api limits to 50 different counts.
+                    for (int i = 0; i <= urlList.Count / 50; i++)
                     {
-                        foreach (string ID in urlList.GetRange(i * 50, urlList.Count - (i * 50)))
+                        string allID = @"encyclopedia/api.xml?";
+                        if (i == urlList.Count / 50)
                         {
-                            allID += "anime=" + ID + @"&";
-                        }
-                    }
-                    else
-                    {
-                        foreach (string ID in urlList.GetRange(i * 50, 50))
-                        {
-                            allID += "anime=" + ID + @"&";
-                        }
-                    }
-                    
-                    string htmlPage = wcc.runWebClientXML(debugMode, 0, url + allID);
-                    XmlTextReader reader = new XmlTextReader(new System.IO.StringReader(htmlPage));
-                    XmlSerializer serializer = new XmlSerializer(typeof(ann));
-                    while (reader.Read())
-                    {
-                        ann ana = (ann)(serializer.Deserialize(reader));
-                        int animeCount = ana.anime.Length;
-                        
-                        for (int y = 0; y < animeCount; y++)
-                        {
-                            string oneLine = "";
-                            //first add the titlename
-                            oneLine += ana.anime[y].name + "$";
-                            
-                            //loop each info for other anime languages
-                            foreach (var item in ana.anime[y].info)
+                            foreach (string ID in urlList.GetRange(i * 50, urlList.Count - (i * 50)))
                             {
-                                if(!string.IsNullOrEmpty(item.type.ToString()))
+                                allID += "anime=" + ID + @"&";
+                            }
+                        }
+                        else
+                        {
+                            foreach (string ID in urlList.GetRange(i * 50, 50))
+                            {
+                                allID += "anime=" + ID + @"&";
+                            }
+                        }
+
+                        string htmlPage = wcc.runWebClientXML(debugMode, 0, url + allID);
+                        XmlTextReader reader = new XmlTextReader(new System.IO.StringReader(htmlPage));
+                        XmlSerializer serializer = new XmlSerializer(typeof(ann));
+                        while (reader.Read())
+                        {
+                            ann ana = (ann)(serializer.Deserialize(reader));
+                            int animeCount = ana.anime.Length;
+
+                            for (int y = 0; y < animeCount; y++)
+                            {
+                                string oneLine = "";
+                                //first add the titlename
+                                oneLine += ana.anime[y].name + "$";
+
+                                //loop each info for other anime languages
+                                foreach (var item in ana.anime[y].info)
                                 {
-                                    if(item.type.ToString().ToLower() == "main title" || item.type.ToString().ToLower() == "alternative title")
+                                    if (!string.IsNullOrEmpty(item.type.ToString()))
                                     {
-                                        oneLine += item.Text[0].ToString() + "$";
-                                    }
-                                    else if (item.type.ToString().ToLower() == "number of episodes")
-                                    {
-                                        oneLine += item.Text[0].ToString();
+                                        if (item.type.ToString().ToLower() == "main title" || item.type.ToString().ToLower() == "alternative title")
+                                        {
+                                            oneLine += item.Text[0].ToString() + "$";
+                                        }
+                                        else if (item.type.ToString().ToLower() == "number of episodes")
+                                        {
+                                            oneLine += item.Text[0].ToString();
+                                        }
                                     }
                                 }
+                                AnimeList.Add(oneLine);
                             }
-                            AnimeList.Add(oneLine);
                         }
                     }
+                    //writerHelper.WriterText(@"C:\Users\Genryu\Desktop\", @"log.txt", AnimeList);
                 }
-                writerHelper.WriterText(@"C:\Users\Genryu\Desktop\", @"log.txt", AnimeList);
+                return AnimeList;
             }
+            catch (Exception ex)
+            {
+                ErrorLog.LogError(ex);
+                return null;
+            }
+            
         }
 
         private int getTotalPages()
